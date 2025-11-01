@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
+import Register from './pages/Register' // Yeni ekledik
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
 import Events from './pages/Events'
@@ -49,6 +50,14 @@ function App() {
           element={
             <PublicRoute>
               <Login />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            <PublicRoute>
+              <Register />
             </PublicRoute>
           } 
         />

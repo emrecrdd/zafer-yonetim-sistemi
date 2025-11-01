@@ -143,11 +143,19 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="mt-6 text-center text-sm text-gray-500">
-              <p>
-                Gönüllü kaydı için ilçe başkanınızla iletişime geçin.
-              </p>
-            </div>
+            <div className="mt-6 text-center text-sm text-gray-500 space-y-2">
+  <p>
+    Henüz hesabınız yoksa, üyeler ve gönüllülerimiz <a href="/register" className="text-red-600 hover:text-red-700 font-medium">buradan kayıt olabilir</a>.
+  </p>
+  
+  <p>
+    Kayıt sırasında adınız, soyadınız, telefon numaranız, mesleğiniz ve yetenekleriniz istenecektir. Bu bilgiler, görev dağıtımı ve proje yönetiminde kullanılacaktır.
+  </p>
+  <p>
+    Lütfen bilgilerinizi eksiksiz ve doğru giriniz.
+  </p>
+</div>
+
           </div>
         </div>
       </div>

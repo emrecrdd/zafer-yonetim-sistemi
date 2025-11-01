@@ -344,18 +344,19 @@ const Users = () => {
                     </div>
 
                     {/* Beceriler */}
-                    {user.skills && user.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {user.skills.map((skill, index) => (
-                          <span 
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                   {Array.isArray(user.skills) && user.skills.length > 0 && (
+  <div className="flex flex-wrap gap-1 mb-3">
+    {user.skills.map((skill, index) => (
+      <span 
+        key={index}
+        className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
+      >
+        {skill}
+      </span>
+    ))}
+  </div>
+)}
+
 
                     {/* Son Aktivite */}
                     {user.lastActivity && (
