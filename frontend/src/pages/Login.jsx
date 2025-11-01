@@ -65,11 +65,16 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-xl">Z</span>
-          </div>
-        </div>
+       <div className="flex justify-center">
+  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-red-600">
+    <img 
+      src="/zafer.png"   // public klasöründe logo.png olmalı
+      alt="Zafer Partisi Logo"
+      className="w-full h-full object-cover"
+    />
+  </div>
+</div>
+
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Zafer Partisi Yönetim Sistemi
         </h2>
