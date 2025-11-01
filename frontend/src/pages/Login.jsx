@@ -68,7 +68,7 @@ const Login = () => {
        <div className="flex justify-center">
   <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-red-600">
     <img 
-      src="/vite.jpg"   // public klasöründe logo.png olmalı
+      src="/public/vite.jpg"   // public klasöründe logo.png olmalı
       alt="Zafer Partisi Logo"
       className="w-full h-full object-cover"
     />
