@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { taskService } from '../../services/tasks';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
+import { io } from 'socket.io-client';
 
 const TaskForm = ({ task, onSuccess, onCancel }) => {
-  const { user, isIlBaskani } = useAuth();
+  const { user, isIlBaskani, isIlceBaskani } = useAuth();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [events, setEvents] = useState([]);
-  
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -20,11 +22,17 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
   });
 
   const priorities = [
-    { value: 'low', label: 'Düşük', color: 'bg-gray-100 text-gray-800' },
-    { value: 'medium', label: 'Orta', color: 'bg-blue-100 text-blue-800' },
-    { value: 'high', label: 'Yüksek', color: 'bg-orange-100 text-orange-800' },
-    { value: 'urgent', label: 'Acil', color: 'bg-red-100 text-red-800' }
+    { value: 'low', label: 'Düşük' },
+    { value: 'medium', label: 'Orta' },
+    { value: 'high', label: 'Yüksek' },
+    { value: 'urgent', label: 'Acil' }
   ];
+
+  // 🔌 Socket bağlantısı (canlı backend domainini alır)
+  const socket = io(import.meta.env.VITE_API_BASE || 'https://senindomain.com', {
+    transports: ['websocket'],
+    reconnection: true,
+  });
 
   useEffect(() => {
     if (task) {
@@ -38,29 +46,27 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         deadline: task.deadline ? new Date(task.deadline).toISOString().split('T')[0] : ''
       });
     }
-    
-    loadFormData();
-  }, [task, user]);
+  }, [task]);
 
-  const loadFormData = async () => {
-    // Mock data - gerçek uygulamada API'den çekilecek
-    setUsers([
-      { id: 1, name: 'Ahmet', surname: 'Yılmaz', districtId: 1 },
-      { id: 2, name: 'Mehmet', surname: 'Kaya', districtId: 1 },
-      { id: 3, name: 'Ayşe', surname: 'Demir', districtId: 2 }
-    ]);
-    
-    setDistricts([
-      { id: 1, name: 'Çankaya' },
-      { id: 2, name: 'Yenimahalle' },
-      { id: 3, name: 'Keçiören' }
-    ]);
-    
-    setEvents([
-      { id: 1, title: 'Toplantı - Çankaya' },
-      { id: 2, title: 'Stant - Yenimahalle' }
-    ]);
-  };
+  // 🔄 Dinamik verileri yükle
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [userRes, districtRes, eventRes] = await Promise.all([
+          api.get('/users'),
+          api.get('/districts'),
+          api.get('/events')
+        ]);
+
+        setUsers(userRes.data.users || []);
+        setDistricts(districtRes.data.districts || []);
+        setEvents(eventRes.data.events || []);
+      } catch (err) {
+        console.error('Veri yüklenemedi:', err);
+      }
+    };
+    loadData();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -77,7 +83,7 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
     try {
       const submitData = {
         ...formData,
-        deadline: new Date(formData.deadline).toISOString()
+        deadline: new Date(formData.deadline).toISOString(),
       };
 
       let response;
@@ -87,94 +93,91 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         response = await taskService.createTask(submitData);
       }
 
+      // 🔔 Bildirim gönder (örneğin görevi atanan kullanıcıya)
+      if (response.success && formData.assignedTo) {
+        socket.emit('notification:new', {
+          type: 'task',
+          userId: formData.assignedTo,
+          message: `${user.name} ${user.surname} size bir görev atadı.`,
+        });
+      }
+
       if (response.success) {
         onSuccess(response.task || response.message);
       }
     } catch (error) {
-      console.error('Task form error:', error);
-      alert(error.response?.data?.error || 'İşlem başarısız');
+      console.error('Görev form hatası:', error);
+      alert(error.response?.data?.error || 'Görev kaydedilemedi');
     } finally {
       setLoading(false);
     }
   };
 
-  // İlçeye göre kullanıcıları filtrele
-  const filteredUsers = users.filter(user => 
-    !formData.districtId || user.districtId == formData.districtId
-  );
+  // İlçe filtreli kullanıcı listesi
+  const filteredUsers = users.filter(u => !formData.districtId || u.districtId == formData.districtId);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Başlık */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Görev Başlığı *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Görev Başlığı *</label>
           <input
             type="text"
             name="title"
             value={formData.title}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
-            placeholder="Görev başlığını girin"
+            placeholder="Görev başlığı girin"
+            className="w-full border px-3 py-2 rounded-md focus:ring-red-500 focus:border-red-500"
           />
         </div>
 
         {/* Açıklama */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Açıklama
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleChange}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
             placeholder="Görev detaylarını girin"
+            className="w-full border px-3 py-2 rounded-md focus:ring-red-500 focus:border-red-500"
           />
         </div>
 
         {/* İlçe */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            İlçe *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">İlçe *</label>
           <select
             name="districtId"
             value={formData.districtId}
             onChange={handleChange}
             required
             disabled={!isIlBaskani && user?.districtId}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 disabled:bg-gray-50"
+            className="w-full border px-3 py-2 rounded-md disabled:bg-gray-100"
           >
             <option value="">İlçe seçin</option>
-            {districts.map(district => (
-              <option key={district.id} value={district.id}>
-                {district.name}
-              </option>
+            {districts.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         </div>
 
-        {/* Atanan Kullanıcı */}
+        {/* Kullanıcı */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Atanan Kullanıcı *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Atanan Kullanıcı *</label>
           <select
             name="assignedTo"
             value={formData.assignedTo}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full border px-3 py-2 rounded-md"
           >
             <option value="">Kullanıcı seçin</option>
-            {filteredUsers.map(user => (
-              <option key={user.id} value={user.id}>
-                {user.name} {user.surname}
+            {filteredUsers.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.name} {u.surname}
               </option>
             ))}
           </select>
@@ -182,57 +185,47 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
 
         {/* Etkinlik */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            İlgili Etkinlik
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">İlgili Etkinlik</label>
           <select
             name="eventId"
             value={formData.eventId}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full border px-3 py-2 rounded-md"
           >
-            <option value="">Etkinlik seçin (opsiyonel)</option>
-            {events.map(event => (
-              <option key={event.id} value={event.id}>
-                {event.title}
-              </option>
+            <option value="">Etkinlik seçin</option>
+            {events.map(e => (
+              <option key={e.id} value={e.id}>{e.title}</option>
             ))}
           </select>
         </div>
 
         {/* Öncelik */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Öncelik *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Öncelik *</label>
           <select
             name="priority"
             value={formData.priority}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+            className="w-full border px-3 py-2 rounded-md"
           >
-            {priorities.map(priority => (
-              <option key={priority.value} value={priority.value}>
-                {priority.label}
-              </option>
+            {priorities.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
         </div>
 
         {/* Son Tarih */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Son Tarih *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Son Tarih *</label>
           <input
             type="date"
             name="deadline"
             value={formData.deadline}
             onChange={handleChange}
-            required
             min={new Date().toISOString().split('T')[0]}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+            required
+            className="w-full border px-3 py-2 rounded-md"
           />
         </div>
       </div>
@@ -242,14 +235,14 @@ const TaskForm = ({ task, onSuccess, onCancel }) => {
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
         >
           İptal
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
         >
           {loading ? 'Kaydediliyor...' : task ? 'Güncelle' : 'Oluştur'}
         </button>
