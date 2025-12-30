@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications.js';
 import dashboardRoutes from './routes/dashboard.js';
 import attendanceRoutes from './routes/attendance.js';
 import setupSocket from './socket/index.js';
+import districtRoutes from './routes/district.js';
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/attendances', attendanceRoutes);
+app.use('/api/districts', districtRoutes);
 
 // Socket.IO
 setupSocket(io);
@@ -75,15 +77,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ DÜZELTİLMİŞ: Tabloları sadece yoksa oluştur
+// ✅ DÜZELTİLMİŞ: Tabloları sync et, User tablosuna yeni alanları ekle
 const syncDatabase = async () => {
   try {
     // Sadece tablo yoksa oluştur, varsa dokunma
     await District.sync();
     console.log('✅ Districts tablosu hazır');
     
-    await User.sync();
-    console.log('✅ Users tablosu hazır');
+    // ✅ User tablosunu ALTER modunda sync et (yeni alanları ekler)
+    await User.sync({ alter: true });
+    console.log('✅ Users tablosu hazır (yeni alanlar eklendi)');
     
     await Event.sync();
     console.log('✅ Events tablosu hazır');
@@ -110,7 +113,7 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('✅ PostgreSQL bağlantısı başarılı');
     
-    // ✅ DÜZELTİLMİŞ: Tabloları sadece yoksa oluştur
+    // ✅ DÜZELTİLMİŞ: Tabloları sync et
     await syncDatabase();
     
     // Database başlangıç verilerini yükle

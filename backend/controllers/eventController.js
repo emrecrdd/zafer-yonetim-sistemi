@@ -1,9 +1,8 @@
-import { Event, District, User, Attendance } from '../models/index.js';
+import { Event, District, User, Attendance, Notification } from '../models/index.js'; // ✅ Notification import et
 import { paginate, buildPagination } from '../utils/helpers.js';
 import { sendEventReminder } from '../utils/smsSender.js';
-import { EVENT_STATUS } from '../config/constants.js';
+import { EVENT_STATUS, USER_ROLES } from '../config/constants.js';
 import { Op } from 'sequelize';
-import { USER_ROLES } from '../config/constants.js';
 
 export const getEvents = async (req, res) => {
   try {
@@ -42,10 +41,10 @@ export const getEvents = async (req, res) => {
       where: whereConditions,
       include: [
         {
-  model: District,
-  as: 'district', // ✅ 'as' EKLE
-  attributes: ['id', 'name']                
-},
+          model: District,
+          as: 'district',
+          attributes: ['id', 'name']                
+        },
         {
           model: User,
           as: 'organizer',
@@ -75,7 +74,7 @@ export const getEventById = async (req, res) => {
       include: [
         {
           model: District,
-           as: 'district', // ✅ 'as' ALIAS EKLE
+          as: 'district',
           attributes: ['id', 'name']
         },
         {
@@ -169,6 +168,43 @@ export const createEvent = async (req, res) => {
 
     await Attendance.bulkCreate(attendanceRecords);
 
+    // 🆕 🎯 BİLDİRİM OLUŞTUR - İlçedeki TÜM kullanıcılara
+    for (const user of districtUsers) {
+      await Notification.create({
+        userId: user.id,
+        title: "Yeni Etkinlik",
+        message: `"${event.title}" etkinliği oluşturuldu - ${new Date(event.date).toLocaleDateString('tr-TR')}`,
+        type: "EVENT_INVITATION",
+        actionUrl: `/events/${event.id}`,
+        relatedId: event.id,
+        relatedType: 'Event',
+        isRead: false
+      });
+    }
+
+    // 🆕 İlçe başkanlarına da bildirim (farklı mesaj)
+    const districtAdmins = await User.findAll({
+      where: { 
+        districtId,
+        role: [USER_ROLES.ILCE_BASKANI, USER_ROLES.IL_BASKANI]
+      }
+    });
+
+    for (const admin of districtAdmins) {
+      await Notification.create({
+        userId: admin.id,
+        title: "Yeni Etkinlik Oluşturuldu",
+        message: `"${event.title}" etkinliği ${req.user.name} tarafından oluşturuldu`,
+        type: "EVENT_INVITATION",
+        actionUrl: `/events/${event.id}`,
+        relatedId: event.id,
+        relatedType: 'Event', 
+        isRead: false
+      });
+    }
+
+    console.log(`📢 ${districtUsers.length} kullanıcıya etkinlik bildirimi gönderildi`);
+
     res.status(201).json({
       success: true,
       message: 'Etkinlik başarıyla oluşturuldu',
@@ -211,6 +247,29 @@ export const updateEvent = async (req, res) => {
       status: status || event.status,
       notes: notes || event.notes
     });
+
+    // 🆕 Etkinlik güncellendi bildirimi
+    const districtUsers = await User.findAll({
+      where: { 
+        districtId: event.districtId,
+        isActive: true
+      }
+    });
+
+    for (const user of districtUsers) {
+      await Notification.create({
+        userId: user.id,
+        title: "Etkinlik Güncellendi",
+        message: `"${event.title}" etkinliğinde değişiklik yapıldı`,
+        type: "EVENT_INVITATION",
+        actionUrl: `/events/${event.id}`,
+        relatedId: event.id,
+        relatedType: 'Event',
+        isRead: false
+      });
+    }
+
+    console.log(`📢 ${districtUsers.length} kullanıcıya etkinlik güncelleme bildirimi gönderildi`);
 
     res.json({
       success: true,
@@ -293,12 +352,14 @@ export const updateAttendance = async (req, res) => {
     }
 
     // Socket ile bildirim gönder
-    req.io.to(`event_${eventId}`).emit('attendance_updated', {
-      eventId,
-      userId: req.user.id,
-      status,
-      timestamp: new Date()
-    });
+    if (req.io) {
+      req.io.to(`event_${eventId}`).emit('attendance_updated', {
+        eventId,
+        userId: req.user.id,
+        status,
+        timestamp: new Date()
+      });
+    }
 
     res.json({
       success: true,

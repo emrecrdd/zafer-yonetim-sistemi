@@ -1,6 +1,5 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
-import { NOTIFICATION_TYPES } from '../config/constants.js';
 
 const Notification = sequelize.define('Notification', {
   id: {
@@ -11,11 +10,25 @@ const Notification = sequelize.define('Notification', {
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false
-    // ✅ Foreign key constraint'i kaldır - sonra association ile ekleyeceğiz
   },
   type: {
-    type: DataTypes.ENUM(...Object.values(NOTIFICATION_TYPES)),
-    defaultValue: NOTIFICATION_TYPES.SYSTEM
+    type: DataTypes.ENUM(
+      'SYSTEM',
+      'TASK_ASSIGNED', 
+      'TASK_UPDATED',
+      'TASK_CREATED',      // ✅ YENİ EKLE
+      'TASK_COMPLETED',    // ✅ YENİ EKLE
+      'EVENT_INVITATION',
+      'EVENT_CREATED',     // ✅ YENİ EKLE
+      'EVENT_UPDATED',     // ✅ YENİ EKLE
+      'EVENT_CANCELLED',   // ✅ YENİ EKLE
+      'ANNOUNCEMENT',
+      'PROVINCE_ANNOUNCEMENT',
+      'DISTRICT_ANNOUNCEMENT',
+      'MESSAGE',           // ✅ YENİ EKLE
+      'REMINDER'           // ✅ YENİ EKLE
+    ),
+    defaultValue: 'SYSTEM'
   },
   title: {
     type: DataTypes.STRING,
@@ -29,6 +42,10 @@ const Notification = sequelize.define('Notification', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+  actionUrl: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   relatedId: {
     type: DataTypes.INTEGER,
     allowNull: true
@@ -36,13 +53,10 @@ const Notification = sequelize.define('Notification', {
   relatedType: {
     type: DataTypes.STRING,
     allowNull: true
-  },
-  actionUrl: {
-    type: DataTypes.STRING,
-    allowNull: true
   }
 }, {
-  tableName: 'notifications'
+  tableName: 'notifications',
+  timestamps: true
 });
 
 export default Notification;

@@ -6,7 +6,9 @@ import {
   updateUser,
   deleteUser,
   getUserStats,
-  getUserTasks
+  getUserTasks,
+    updateProfile  // ✅ BU EKLENDİ!
+
 } from '../controllers/userController.js';
 import { authenticate, canManageUsers } from '../middleware/auth.js'; // ✅ Düzeltildi
 import { requireRole } from '../middleware/roles.js';
@@ -26,6 +28,7 @@ router.post('/', requireRole([USER_ROLES.SUPER_ADMIN, USER_ROLES.IL_BASKANI, USE
 router.get('/:id', getUserById);
 router.put('/:id', requireRole([USER_ROLES.SUPER_ADMIN, USER_ROLES.IL_BASKANI, USER_ROLES.ILCE_BASKANI]), updateUser);
 router.delete('/:id', requireRole([USER_ROLES.SUPER_ADMIN, USER_ROLES.IL_BASKANI, USER_ROLES.ILCE_BASKANI]), deleteUser);
+router.put('/:id/profile', updateProfile);
 
 // Kullanıcı görevleri
 router.get('/:userId/tasks', getUserTasks);

@@ -12,16 +12,12 @@ const User = sequelize.define('User', {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    validate: { notEmpty: true }
   },
   surname: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    validate: { notEmpty: true }
   },
   phone: {
     type: DataTypes.STRING,
@@ -35,9 +31,7 @@ const User = sequelize.define('User', {
   email: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      isEmail: true
-    }
+    validate: { isEmail: true }
   },
   password: {
     type: DataTypes.STRING,
@@ -46,7 +40,6 @@ const User = sequelize.define('User', {
   districtId: {
     type: DataTypes.INTEGER,
     allowNull: false
-    // ✅ Foreign key constraint kaldırıldı
   },
   neighborhood: {
     type: DataTypes.STRING,
@@ -71,36 +64,99 @@ const User = sequelize.define('User', {
   profileImage: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  // ✅ YENİ EKLENECEK PROFİL ALANLARI:
+  profession: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  address: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  
+  birthDate: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  birthPlace: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  gender: {
+    type: DataTypes.ENUM('male', 'female'),
+    allowNull: true
+  },
+  bloodType: {
+    type: DataTypes.ENUM('a_positive', 'a_negative', 'b_positive', 'b_negative', 'ab_positive', 'ab_negative', 'o_positive', 'o_negative'),
+    allowNull: true
+  },
+  maritalStatus: {
+    type: DataTypes.ENUM('single', 'married', 'divorced', 'widowed'),
+    allowNull: true
+  },
+  educationLevel: {
+    type: DataTypes.ENUM('primary', 'middle', 'high', 'university', 'master', 'phd'),
+    allowNull: true
+  },
+  school: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  company: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  position: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  workExperience: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  emergencyContact: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  emergencyPhone: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  bio: {
+    type: DataTypes.TEXT,
+    allowNull: true
   }
 }, {
   tableName: 'users',
   hooks: {
     beforeCreate: async (user) => {
-      if (user.password) {
+      if (user.password && !user.password.startsWith('$2b$')) {
         user.password = await bcrypt.hash(user.password, 12);
       }
     },
     beforeUpdate: async (user) => {
-      if (user.changed('password')) {
+      if (user.changed('password') && !user.password.startsWith('$2b$')) {
         user.password = await bcrypt.hash(user.password, 12);
       }
     }
   }
 });
 
+// Şifre kontrol metodu
 User.prototype.validatePassword = async function(password) {
   try {
     console.log('🔐 PASSWORD VALIDATION DEBUG:');
     console.log('   Input password:', password);
     console.log('   Stored hash:', this.password);
-    console.log('   Comparison result:', await bcrypt.compare(password, this.password));
-    
+
     const result = await bcrypt.compare(password, this.password);
-    console.log('   Final result:', result);
+    console.log('   Comparison result:', result);
     return result;
   } catch (error) {
     console.error('❌ PASSWORD VALIDATION ERROR:', error);
     return false;
   }
 };
+
 export default User;

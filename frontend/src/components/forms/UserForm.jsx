@@ -62,22 +62,48 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    
-    if (type === 'checkbox') {
-      setFormData(prev => ({
-        ...prev,
-        skills: checked 
-          ? [...prev.skills, value]
-          : prev.skills.filter(skill => skill !== value)
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+  const { name, value, type, checked } = e.target;
+
+  // Ad & Soyad özel kuralları
+  if (name === 'name' || name === 'surname') {
+    // Sadece harfler (TR dahil) ve boşluk
+    if (!/^[a-zA-ZçÇğĞıİöÖşŞüÜ\s]*$/.test(value)) {
+      return;
     }
-  };
+
+    // Çift boşlukları teke düşür
+    let formatted = value.replace(/\s{2,}/g, ' ');
+
+    // İlk harfi büyüt (TR uyumlu)
+    if (formatted.length > 0) {
+      formatted =
+        formatted.charAt(0).toLocaleUpperCase('tr-TR') +
+        formatted.slice(1);
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: formatted
+    }));
+    return;
+  }
+
+  // Checkbox (skills)
+  if (type === 'checkbox') {
+    setFormData(prev => ({
+      ...prev,
+      skills: checked
+        ? [...prev.skills, value]
+        : prev.skills.filter(skill => skill !== value)
+    }));
+  } else {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+};
+
 
   const handlePhoneChange = (e) => {
     const value = e.target.value.replace(/\D/g, '');
@@ -154,7 +180,7 @@ const UserForm = ({ user, onSuccess, onCancel }) => {
             value={formData.phone}
             onChange={handlePhoneChange}
             required
-            maxLength={14}
+            maxLength={13}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
             placeholder="555 123 45 67"
           />

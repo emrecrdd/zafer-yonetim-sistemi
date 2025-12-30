@@ -1,17 +1,14 @@
 import { User, District } from '../models/index.js';
 import { generateToken } from '../utils/generateToken.js';
-import { sendWelcomeSMS } from '../utils/smsSender.js';
-import { generatePassword, formatPhone } from '../utils/helpers.js';
+import { formatPhone } from '../utils/helpers.js';
 import { USER_ROLES } from '../config/constants.js';
 
 export const login = async (req, res) => {
   try {
     const { phone, password } = req.body;
-    console.log('🔐 LOGIN REQUEST:', { phone, password });
 
     // Format phone
     const formattedPhone = formatPhone(phone);
-    console.log('   Formatted phone:', formattedPhone);
 
     const user = await User.findOne({
       where: { phone: formattedPhone },
@@ -22,38 +19,20 @@ export const login = async (req, res) => {
       }]
     });
 
-    console.log('👤 USER SEARCH RESULT:');
-    console.log('   User found:', !!user);
-    if (user) {
-      console.log('   User details:', {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        isActive: user.isActive,
-        passwordLength: user.password?.length
-      });
-    }
-
     if (!user || !user.isActive) {
-      console.log('❌ USER NOT FOUND OR INACTIVE');
       return res.status(401).json({
         error: 'Geçersiz telefon veya şifre'
       });
     }
 
-    console.log('🔑 CHECKING PASSWORD...');
     const isValidPassword = await user.validatePassword(password);
-    console.log('   Password valid:', isValidPassword);
 
     if (!isValidPassword) {
-      console.log('❌ INVALID PASSWORD');
       return res.status(401).json({
         error: 'Geçersiz telefon veya şifre'
       });
     }
 
-    console.log('✅ LOGIN SUCCESSFUL');
-    
     // Update last activity
     await user.update({ lastActivity: new Date() });
 
@@ -74,15 +53,16 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ LOGIN ERROR:', error);
+    console.error('Login error:', error);
     res.status(500).json({
       error: 'Giriş işlemi sırasında hata oluştu'
     });
   }
 };
+
 export const register = async (req, res) => {
   try {
-    const { name, surname, phone, districtId, neighborhood, skills } = req.body;
+    const { name, surname, phone, password, districtId, neighborhood, skills } = req.body;
 
     // Telefon kontrolü
     const existingUser = await User.findOne({ 
@@ -103,7 +83,6 @@ export const register = async (req, res) => {
       });
     }
 
-    const password = generatePassword();
     const user = await User.create({
       name,
       surname,
@@ -114,9 +93,6 @@ export const register = async (req, res) => {
       password,
       role: USER_ROLES.GONULLU
     });
-
-    // SMS gönder
-    await sendWelcomeSMS(phone, name, password);
 
     const token = generateToken(user.id, user.role);
 

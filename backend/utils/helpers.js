@@ -8,7 +8,17 @@ export const generatePassword = (length = 8) => {
 };
 
 export const formatPhone = (phone) => {
-  return phone.replace(/\D/g, '');
+  if (!phone) return '';
+  // Sadece rakamları al
+  let numbers = phone.replace(/\D/g, '');
+
+  // Eğer numara 11 haneli ve 90 ile başlıyorsa 0 ile başlat
+  if (numbers.startsWith('90') && numbers.length === 12) {
+    numbers = '0' + numbers.substring(2);
+  }
+
+  // 10 veya 11 haneli rakamları direkt döndür (başına 0 ekleme)
+  return numbers;
 };
 
 export const paginate = (page = 1, limit = 10) => {
@@ -23,8 +33,8 @@ export const buildPagination = (data, page, limit, total) => {
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / limit),
       totalItems: total,
-      itemsPerPage: limit
-    }
+      itemsPerPage: limit,
+    },
   };
 };
 

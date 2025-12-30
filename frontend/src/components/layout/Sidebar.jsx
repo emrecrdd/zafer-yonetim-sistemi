@@ -46,14 +46,25 @@ const navigation = [
     <div className="w-64 bg-white shadow-sm border-r">
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="flex items-center justify-center h-16 border-b">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">ZP</span>
-            </div>
-            <span className="font-bold text-gray-900">Zafer Partisi</span>
-          </div>
-        </div>
+       <div className="flex items-center justify-center h-16 border-b bg-white shadow-sm">
+  <div className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 transition-colors rounded-md cursor-pointer">
+    
+    {/* Logo Görseli */}
+    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-red-600 shadow-md flex-shrink-0">
+      <img 
+        src="/vite.jpg"   // public klasöründen direkt path
+        alt="Zafer Partisi Logo"
+        className="w-full h-full object-cover"
+      />
+    </div>
+
+    {/* Yazı */}
+    <span className="font-bold text-gray-900 text-lg md:text-xl select-none">
+      Zafer Partisi
+    </span>
+  </div>
+</div>
+
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-2">

@@ -41,5 +41,9 @@ export const userService = {
   getUserTasks: async (userId, params = {}) => {
     const response = await api.get(`/users/${userId}/tasks`, { params });
     return response.data;
+  },
+  updateProfile: async (userId, userData) => {
+    const response = await api.put(`/users/${userId}/profile`, userData);
+    return response.data;
   }
 };

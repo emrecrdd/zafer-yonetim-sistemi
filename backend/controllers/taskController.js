@@ -1,7 +1,7 @@
-import { Task, User, District, Event } from '../models/index.js';
+import { Task, User, District, Event, Notification } from '../models/index.js';
 import { paginate, buildPagination } from '../utils/helpers.js';
 import { TASK_STATUS } from '../config/constants.js';
-import { USER_ROLES } from '../config/constants.js'; // ✅ BU SATIRI EKLE
+import { USER_ROLES } from '../config/constants.js';
 import { Op } from 'sequelize';
 
 export const getTasks = async (req, res) => {
@@ -11,7 +11,6 @@ export const getTasks = async (req, res) => {
 
     const whereConditions = {};
     
-    // Filtreleme
     if (districtId) {
       if (req.user.role === USER_ROLES.ILCE_BASKANI) {
         whereConditions.districtId = req.user.districtId;
@@ -20,24 +19,14 @@ export const getTasks = async (req, res) => {
       }
     }
 
-    if (status) {
-      whereConditions.status = status;
-    }
+    if (status) whereConditions.status = status;
+    if (assignedTo) whereConditions.assignedTo = assignedTo;
+    if (priority) whereConditions.priority = priority;
 
-    if (assignedTo) {
-      whereConditions.assignedTo = assignedTo;
-    }
-
-    if (priority) {
-      whereConditions.priority = priority;
-    }
-
-    // Gönüllü sadece kendi görevlerini görür
     if (req.user.role === USER_ROLES.GONULLU) {
       whereConditions.assignedTo = req.user.id;
     }
 
-    // İlçe başkanı sadece kendi ilçesini görür
     if (req.user.role === USER_ROLES.ILCE_BASKANI) {
       whereConditions.districtId = req.user.districtId;
     }
@@ -57,12 +46,12 @@ export const getTasks = async (req, res) => {
         },
         {
           model: District,
-             as: 'district', // ✅ 'as' EKLE
+          as: 'district',
           attributes: ['id', 'name']
         },
         {
           model: Event,
-            as: 'event', // ✅ 'as' EKLE
+          as: 'event',
           attributes: ['id', 'title']
         }
       ],
@@ -75,9 +64,7 @@ export const getTasks = async (req, res) => {
 
   } catch (error) {
     console.error('Get tasks error:', error);
-    res.status(500).json({
-      error: 'Görevler getirilirken hata oluştu'
-    });
+    res.status(500).json({ error: 'Görevler getirilirken hata oluştu' });
   }
 };
 
@@ -109,67 +96,38 @@ export const getTaskById = async (req, res) => {
     });
 
     if (!task) {
-      return res.status(404).json({
-        error: 'Görev bulunamadı'
-      });
+      return res.status(404).json({ error: 'Görev bulunamadı' });
     }
 
-    // Yetki kontrolü
     if (req.user.role === USER_ROLES.GONULLU && task.assignedTo !== req.user.id) {
-      return res.status(403).json({
-        error: 'Bu görevi görüntüleme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Bu görevi görüntüleme yetkiniz yok' });
     }
 
     if (req.user.role === USER_ROLES.ILCE_BASKANI && task.districtId !== req.user.districtId) {
-      return res.status(403).json({
-        error: 'Bu görevi görüntüleme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Bu görevi görüntüleme yetkiniz yok' });
     }
 
-    res.json({
-      success: true,
-      task
-    });
+    res.json({ success: true, task });
 
   } catch (error) {
     console.error('Get task error:', error);
-    res.status(500).json({
-      error: 'Görev bilgileri alınamadı'
-    });
+    res.status(500).json({ error: 'Görev bilgileri alınamadı' });
   }
 };
 
 export const createTask = async (req, res) => {
   try {
-    const { 
-      title, 
-      description, 
-      assignedTo, 
-      districtId, 
-      eventId, 
-      priority, 
-      deadline 
-    } = req.body;
+    const { title, description, assignedTo, districtId, eventId, priority, deadline } = req.body;
 
-    // eventId boş stringse null yap
     const processedEventId = (eventId === '' || eventId === null) ? null : parseInt(eventId);
 
-    // Yetki kontrolü
-    if (req.user.role === USER_ROLES.ILCE_BASKANI) {
-      if (districtId !== req.user.districtId) {
-        return res.status(403).json({
-          error: 'Sadece kendi ilçenize görev ekleyebilirsiniz'
-        });
-      }
+    if (req.user.role === USER_ROLES.ILCE_BASKANI && districtId !== req.user.districtId) {
+      return res.status(403).json({ error: 'Sadece kendi ilçenize görev ekleyebilirsiniz' });
     }
 
-    // Atanan kullanıcı kontrolü
     const assignedUser = await User.findByPk(assignedTo);
     if (!assignedUser || !assignedUser.isActive) {
-      return res.status(400).json({
-        error: 'Geçersiz kullanıcı'
-      });
+      return res.status(400).json({ error: 'Geçersiz kullanıcı' });
     }
 
     const task = await Task.create({
@@ -184,15 +142,37 @@ export const createTask = async (req, res) => {
       status: TASK_STATUS.PENDING
     });
 
-    // Socket.io kontrolü - eğer varsa bildirim gönder
-    if (req.io) {
-      req.io.to(`user_${assignedTo}`).emit('new_notification', {
-        title: 'Yeni Görev',
-        message: `"${title}" görevi size atandı`,
-        type: 'task_assigned',
-        timestamp: new Date()
+    // 🆕 BİLDİRİM - Görev atanan kullanıcıya
+    await Notification.create({
+      userId: assignedTo,
+      title: "Yeni Görev Atandı",
+      message: `"${title}" görevi size atandı - Son tarih: ${new Date(deadline).toLocaleDateString('tr-TR')}`,
+      type: "TASK_ASSIGNED",
+      actionUrl: `/tasks/${task.id}`,
+      relatedId: task.id,
+      relatedType: 'Task',
+      isRead: false
+    });
+
+    // 🆕 BİLDİRİM - İlçe başkanlarına
+    const districtAdmins = await User.findAll({
+      where: { districtId, role: [USER_ROLES.ILCE_BASKANI, USER_ROLES.IL_BASKANI] }
+    });
+
+    for (const admin of districtAdmins) {
+      await Notification.create({
+        userId: admin.id,
+        title: "Yeni Görev Oluşturuldu",
+        message: `"${title}" görevi ${req.user.name} tarafından oluşturuldu`,
+        type: "TASK_CREATED",
+        actionUrl: `/tasks/${task.id}`,
+        relatedId: task.id,
+        relatedType: 'Task',
+        isRead: false
       });
     }
+
+    console.log(`📢 Görev bildirimi gönderildi - Atanan: ${assignedTo}`);
 
     res.status(201).json({
       success: true,
@@ -202,53 +182,28 @@ export const createTask = async (req, res) => {
 
   } catch (error) {
     console.error('Create task error:', error);
-    res.status(500).json({
-      error: 'Görev oluşturulurken hata oluştu'
-    });
+    res.status(500).json({ error: 'Görev oluşturulurken hata oluştu' });
   }
 };
 
 export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    // ✅ DEĞİŞKENLERİ req.body'den DESTRUCTURE ET
-    const { 
-      title, 
-      description, 
-      status, 
-      progress, 
-      priority, 
-      notes 
-    } = req.body;
+    const { title, description, status, progress, priority, notes } = req.body;
     
     console.log('🔄 Güncellenmek istenen görev ID:', id);
-    console.log('🔍 Tüm parametreler:', req.params);
-    console.log('📦 Gelen body:', req.body);
 
     const task = await Task.findByPk(id);
     if (!task) {
-      console.log('❌ Görev bulunamadı, ID:', id);
-      
-      // Database'deki tüm görevleri listele
-      const allTasks = await Task.findAll({ attributes: ['id', 'title'] });
-      console.log('📋 Databasedeki tüm görevler:', allTasks.map(t => ({ id: t.id, title: t.title })));
-      
-      return res.status(404).json({
-        error: 'Görev bulunamadı'
-      });
+      return res.status(404).json({ error: 'Görev bulunamadı' });
     }
 
-    // Yetki kontrolü
     if (req.user.role === USER_ROLES.GONULLU && task.assignedTo !== req.user.id) {
-      return res.status(403).json({
-        error: 'Bu görevi güncelleme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Bu görevi güncelleme yetkiniz yok' });
     }
 
     if (req.user.role === USER_ROLES.ILCE_BASKANI && task.districtId !== req.user.districtId) {
-      return res.status(403).json({
-        error: 'Bu görevi güncelleme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Bu görevi güncelleme yetkiniz yok' });
     }
 
     const previousProgress = task.progress;
@@ -264,15 +219,37 @@ export const updateTask = async (req, res) => {
       completedAt: status === TASK_STATUS.COMPLETED ? new Date() : task.completedAt
     });
 
-    // Socket.io kontrolü - eğer varsa bildirim gönder
-    if (req.io && (progress !== previousProgress || status !== previousStatus)) {
-      req.io.to(`district_${task.districtId}`).emit('task_progress_update', {
-        taskId: task.id,
-        progress: task.progress,
-        status: task.status,
-        updatedBy: req.user.id,
-        timestamp: new Date()
+    // 🆕 GÖREV GÜNCELLENDİ BİLDİRİMİ
+    if (progress !== previousProgress || status !== previousStatus) {
+      await Notification.create({
+        userId: task.assignedTo,
+        title: "Görev Güncellendi",
+        message: `"${task.title}" görevinin durumu güncellendi: ${status} - %${progress}`,
+        type: "TASK_UPDATED",
+        actionUrl: `/tasks/${task.id}`,
+        relatedId: task.id,
+        relatedType: 'Task',
+        isRead: false
       });
+
+      const districtAdmins = await User.findAll({
+        where: { districtId: task.districtId, role: [USER_ROLES.ILCE_BASKANI, USER_ROLES.IL_BASKANI] }
+      });
+
+      for (const admin of districtAdmins) {
+        await Notification.create({
+          userId: admin.id,
+          title: "Görev Durumu Değişti",
+          message: `"${task.title}" görevinin durumu ${req.user.name} tarafından güncellendi: ${status}`,
+          type: "TASK_UPDATED",
+          actionUrl: `/tasks/${task.id}`,
+          relatedId: task.id,
+          relatedType: 'Task',
+          isRead: false
+        });
+      }
+
+      console.log(`📢 Görev güncelleme bildirimi gönderildi`);
     }
 
     res.json({
@@ -283,41 +260,30 @@ export const updateTask = async (req, res) => {
 
   } catch (error) {
     console.error('Update task error:', error);
-    res.status(500).json({
-      error: 'Görev güncellenirken hata oluştu'
-    });
+    res.status(500).json({ error: 'Görev güncellenirken hata oluştu' });
   }
 };
+
 export const deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
 
     const task = await Task.findByPk(id);
     if (!task) {
-      return res.status(404).json({
-        error: 'Görev bulunamadı'
-      });
+      return res.status(404).json({ error: 'Görev bulunamadı' });
     }
 
-    // Yetki kontrolü
     if (req.user.role === USER_ROLES.ILCE_BASKANI && task.districtId !== req.user.districtId) {
-      return res.status(403).json({
-        error: 'Bu görevi silme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Bu görevi silme yetkiniz yok' });
     }
 
     await task.destroy();
 
-    res.json({
-      success: true,
-      message: 'Görev başarıyla silindi'
-    });
+    res.json({ success: true, message: 'Görev başarıyla silindi' });
 
   } catch (error) {
     console.error('Delete task error:', error);
-    res.status(500).json({
-      error: 'Görev silinirken hata oluştu'
-    });
+    res.status(500).json({ error: 'Görev silinirken hata oluştu' });
   }
 };
 
@@ -327,16 +293,10 @@ export const getUserTasks = async (req, res) => {
     const { status } = req.query;
 
     const whereConditions = { assignedTo: userId };
+    if (status) whereConditions.status = status;
 
-    if (status) {
-      whereConditions.status = status;
-    }
-
-    // Yetki kontrolü - Kullanıcı sadece kendi görevlerini görebilir
     if (req.user.role === USER_ROLES.GONULLU && userId != req.user.id) {
-      return res.status(403).json({
-        error: 'Başka kullanıcıların görevlerini görüntüleme yetkiniz yok'
-      });
+      return res.status(403).json({ error: 'Başka kullanıcıların görevlerini görüntüleme yetkiniz yok' });
     }
 
     const tasks = await Task.findAll({
@@ -347,23 +307,15 @@ export const getUserTasks = async (req, res) => {
           as: 'assigner',
           attributes: ['id', 'name', 'surname']
         },
-        {
-          model: District,
-          attributes: ['id', 'name']
-        }
+        { model: District, attributes: ['id', 'name'] }
       ],
       order: [['deadline', 'ASC']]
     });
 
-    res.json({
-      success: true,
-      tasks
-    });
+    res.json({ success: true, tasks });
 
   } catch (error) {
     console.error('Get user tasks error:', error);
-    res.status(500).json({
-      error: 'Kullanıcı görevleri getirilirken hata oluştu'
-    });
+    res.status(500).json({ error: 'Kullanıcı görevleri getirilirken hata oluştu' });
   }
 };

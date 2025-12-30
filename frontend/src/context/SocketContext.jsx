@@ -21,91 +21,102 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const newSocket = io('http://localhost:3000', {
+      // 🌍 Ortama göre socket adresi belirle
+      const SOCKET_URL =
+        import.meta.env.MODE === 'development'
+          ? 'http://localhost:5000' // local backend port
+          : 'https://zafer-yonetim-sistemi.onrender.com'; // canlı backend URL (Render)
+
+      const newSocket = io(SOCKET_URL, {
         auth: {
-          token: localStorage.getItem('token')
-        }
+          token: localStorage.getItem('token'),
+        },
+        transports: ['websocket'],
+        withCredentials: true,
       });
 
       newSocket.on('connect', () => {
         console.log('🔌 Socket connected:', newSocket.id);
-        
-        // Backend'deki user_connected event'ini tetikle
+
+        // Kullanıcıyı backend’e bildir
         newSocket.emit('user_connected', user.id);
-        
-        // İlçe odasına katıl
+
+        // İlçe odasına katıl (districtId varsa)
         if (user.districtId) {
-          newSocket.emit('user_connected', user.districtId); // district odasına da katıl
+          newSocket.emit('join_district_room', user.districtId);
+          console.log('🏘 Joined district room:', user.districtId);
         }
       });
 
-      // Yeni bildirim event'i
+      // 🔔 Yeni bildirim
       newSocket.on('new_notification', (notification) => {
         console.log('🔔 New notification:', notification);
-        setNotifications(prev => [{
-          id: Date.now(), // Geçici ID
-          ...notification,
-          createdAt: new Date(),
-          isRead: false
-        }, ...prev]);
-        setUnreadCount(prev => prev + 1);
-        
-        // Browser bildirimi göster
+        setNotifications((prev) => [
+          {
+            id: Date.now(),
+            ...notification,
+            createdAt: new Date(),
+            isRead: false,
+          },
+          ...prev,
+        ]);
+        setUnreadCount((prev) => prev + 1);
+
+        // Browser bildirimi
         if (Notification.permission === 'granted') {
           new Notification(notification.title, {
             body: notification.message,
-            icon: '/logo.png'
+            icon: '/logo.png',
           });
         }
       });
 
-      // Görev güncelleme event'i
+      // 📊 Görev ilerlemesi
       newSocket.on('task_progress_update', (data) => {
         console.log('📊 Task progress update:', data);
-        // Bu event geldiğinde görev listesini yeniden yükleyebilirsin
-        // veya state güncelleyebilirsin
       });
 
-      // Katılım güncelleme event'i
+      // 🎯 Katılım güncellemesi
       newSocket.on('attendance_updated', (data) => {
         console.log('🎯 Attendance updated:', data);
-        // Etkinlik sayfasında katılım durumunu güncelleyebilirsin
       });
 
-      // Sistem duyurusu event'i
+      // 📢 Yeni sistem duyurusu
       newSocket.on('new_announcement', (data) => {
         console.log('📢 New announcement:', data);
-        // Sistem duyurusunu göster
-        setNotifications(prev => [{
-          id: Date.now(),
-          title: 'Sistem Duyurusu',
-          message: data.message,
-          type: 'SYSTEM_ANNOUNCEMENT',
-          createdAt: new Date(data.timestamp),
-          isRead: false
-        }, ...prev]);
-        setUnreadCount(prev => prev + 1);
+        setNotifications((prev) => [
+          {
+            id: Date.now(),
+            title: 'Sistem Duyurusu',
+            message: data.message,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            createdAt: new Date(data.timestamp),
+            isRead: false,
+          },
+          ...prev,
+        ]);
+        setUnreadCount((prev) => prev + 1);
       });
 
       newSocket.on('disconnect', () => {
         console.log('🔌 Socket disconnected');
       });
 
-      newSocket.on('error', (error) => {
-        console.error('❌ Socket error:', error);
+      newSocket.on('connect_error', (err) => {
+        console.error('❌ Socket connection error:', err.message);
       });
 
       setSocket(newSocket);
 
-      // İlk bildirimleri yükle
+      // Bildirimleri yükle
       loadNotifications();
       loadUnreadCount();
 
       return () => {
         newSocket.close();
+        console.log('🧹 Socket closed');
       };
     } else {
-      // Kullanıcı çıkış yaptığında socket'i kapat
       if (socket) {
         socket.close();
         setSocket(null);
@@ -113,6 +124,7 @@ export const SocketProvider = ({ children }) => {
     }
   }, [isAuthenticated, user]);
 
+  // 📨 Bildirimleri yükle
   const loadNotifications = async () => {
     try {
       const response = await notificationService.getNotifications({ limit: 10 });
@@ -135,20 +147,18 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  // 🔖 Bildirimi okundu işaretle
   const markAsRead = async (notificationId) => {
     try {
-      // Eğer gerçek bir notification ID'si ise (sayısal)
       if (typeof notificationId === 'number') {
         await notificationService.markAsRead(notificationId);
       }
-      
-      // Local state'i güncelle
-      setNotifications(prev => 
-        prev.map(notif => 
+      setNotifications((prev) =>
+        prev.map((notif) =>
           notif.id === notificationId ? { ...notif, isRead: true } : notif
         )
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Mark as read error:', error);
     }
@@ -157,8 +167,8 @@ export const SocketProvider = ({ children }) => {
   const markAllAsRead = async () => {
     try {
       await notificationService.markAllAsRead();
-      setNotifications(prev => 
-        prev.map(notif => ({ ...notif, isRead: true }))
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, isRead: true }))
       );
       setUnreadCount(0);
     } catch (error) {
@@ -166,54 +176,52 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  // 🗑 Bildirimi sil
   const deleteNotification = async (notificationId) => {
     try {
-      // Eğer gerçek bir notification ID'si ise
       if (typeof notificationId === 'number') {
         await notificationService.deleteNotification(notificationId);
       }
-      
-      // Local state'ten kaldır
-      const notification = notifications.find(n => n.id === notificationId);
+      const notification = notifications.find((n) => n.id === notificationId);
       if (notification && !notification.isRead) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       }
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (error) {
       console.error('Delete notification error:', error);
     }
   };
 
-  // Socket üzerinden bildirim gönderme fonksiyonu
+  // 📤 Bildirim gönder
   const sendNotification = (userId, title, message, type = 'SYSTEM_ANNOUNCEMENT') => {
     if (socket) {
       socket.emit('send_notification', {
         userId,
         title,
         message,
-        type
+        type,
       });
     }
   };
 
-  // Görev güncellemesi gönderme
+  // 📤 Görev güncellemesi gönder
   const sendTaskUpdate = (taskId, progress, districtId) => {
     if (socket) {
       socket.emit('task_updated', {
         taskId,
         progress,
         districtId,
-        updatedBy: user?.id
+        updatedBy: user?.id,
       });
     }
   };
 
-  // Sistem duyurusu gönderme
+  // 📢 Sistem duyurusu gönder
   const sendAnnouncement = (message, districtId = null) => {
     if (socket) {
       socket.emit('send_announcement', {
         districtId,
-        message
+        message,
       });
     }
   };
@@ -229,7 +237,7 @@ export const SocketProvider = ({ children }) => {
     loadUnreadCount,
     sendNotification,
     sendTaskUpdate,
-    sendAnnouncement
+    sendAnnouncement,
   };
 
   return (

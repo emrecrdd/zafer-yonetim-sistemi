@@ -3,7 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
-import Register from './pages/Register' // Yeni ekledik
+import Notifications from './pages/Notifications'
+import Register from './pages/Register' 
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
 import Events from './pages/Events'
@@ -77,6 +78,7 @@ function App() {
           <Route path="events" element={<Events />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="profile" element={<Profile />} />
+           <Route path="notifications" element={<Notifications />} />  
         </Route>
 
         {/* 404 route */}

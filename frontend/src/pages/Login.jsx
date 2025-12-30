@@ -36,17 +36,27 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const result = await login(formData.phone, formData.password);
+    // 🔧 TELEFON FORMATINI DÜZELT: Boşlukları kaldır ve başındaki 0'ı sil
+    const cleanPhone = formData.phone.replace(/\s/g, '').replace(/^0/, '');
+    
+    console.log('📞 Login attempt:', { 
+      original: formData.phone, 
+      cleaned: cleanPhone 
+    });
+
+    const result = await login(cleanPhone, formData.password);
     
     if (result.success) {
       navigate(from, { replace: true });
+    } else {
+      console.log('❌ Login failed:', result.error);
     }
     
     setIsLoading(false);
   };
 
   const formatPhoneInput = (value) => {
-    // Telefon numarasını formatla (555 555 55 55)
+    // Telefon numarasını formatla (555 555 55 55) - sadece görsel
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 10) {
       const match = numbers.match(/^(\d{3})(\d{3})(\d{2})(\d{2})$/);
@@ -66,10 +76,15 @@ const Login = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-xl">Z</span>
+          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-red-600">
+            <img 
+              src="/vite.jpg"
+              alt="Zafer Partisi Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
+
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Zafer Partisi Yönetim Sistemi
         </h2>
@@ -103,6 +118,9 @@ const Login = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                📞 Format: <strong>555 555 55 55</strong> (başında 0 OLMADAN)
+              </p>
             </div>
 
             <div>
@@ -144,18 +162,17 @@ const Login = () => {
             </div>
 
             <div className="mt-6 text-center text-sm text-gray-500 space-y-2">
-  <p>
-    Henüz hesabınız yoksa, üyeler ve gönüllülerimiz <a href="/register" className="text-red-600 hover:text-red-700 font-medium">buradan kayıt olabilir</a>.
-  </p>
-  
-  <p>
-    Kayıt sırasında adınız, soyadınız, telefon numaranız, mesleğiniz ve yetenekleriniz istenecektir. Bu bilgiler, görev dağıtımı ve proje yönetiminde kullanılacaktır.
-  </p>
-  <p>
-    Lütfen bilgilerinizi eksiksiz ve doğru giriniz.
-  </p>
-</div>
-
+              <p>
+                Henüz hesabınız yoksa, üyeler ve gönüllülerimiz <a href="/register" className="text-red-600 hover:text-red-700 font-medium">buradan kayıt olabilir</a>.
+              </p>
+              
+              <p>
+                Kayıt sırasında adınız, soyadınız, telefon numaranız, mesleğiniz ve yetenekleriniz istenecektir. Bu bilgiler, görev dağıtımı ve proje yönetiminde kullanılacaktır.
+              </p>
+              <p>
+                Lütfen bilgilerinizi eksiksiz ve doğru giriniz.
+              </p>
+            </div>
           </div>
         </div>
       </div>
